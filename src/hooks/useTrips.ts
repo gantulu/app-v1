@@ -13,7 +13,7 @@ export interface BookedTrip {
   status: string;
 }
 
-export function useTrips(showToast: (message: string) => void) {
+export function useTrips(showToast: (message: string) => void, bookmarkedCount: number) {
   const [bookedTrips, setBookedTrips] = useState<BookedTrip[]>([{
     bookingCode: 'TRV-8842',
     place: DESTINATIONS[0],
@@ -57,10 +57,10 @@ export function useTrips(showToast: (message: string) => void) {
 
   const missionsList = useMemo(() => [
     { id: 'm1', title: 'Langkah Pertama', desc: 'Lakukan pemesanan paket wisata pertama Anda', xp: 500, completed: bookedTrips.length >= 1, progressText: `${Math.min(bookedTrips.length, 1)}/1 Trip` },
-    { id: 'm2', title: 'Kolektor Impian', desc: 'Simpan minimal 3 destinasi ke daftar favorit', xp: 250, completed: false, progressText: '0/3 Disimpan' },
+    { id: 'm2', title: 'Kolektor Impian', desc: 'Simpan minimal 3 destinasi ke daftar favorit', xp: 250, completed: bookmarkedCount >= 3, progressText: `${Math.min(bookmarkedCount, 3)}/3 Disimpan` },
     { id: 'm3', title: 'Jiwa Petualang', desc: 'Jelajahi 2 destinasi kategori Petualangan', xp: 300, completed: viewedAdventureCount >= 2, progressText: `${Math.min(viewedAdventureCount, 2)}/2 Destinasi` },
     { id: 'm4', title: 'Penjelajah Setia', desc: 'Check-in harian untuk menjaga streak liburan', xp: 150, completed: hasCheckedInToday, progressText: hasCheckedInToday ? 'Selesai Hari Ini' : 'Belum Check-in' }
-  ], [bookedTrips.length, viewedAdventureCount, hasCheckedInToday]);
+  ], [bookedTrips.length, bookmarkedCount, viewedAdventureCount, hasCheckedInToday]);
 
   const unreadNotificationsCount = notifications.filter((item) => item.unread).length;
 
