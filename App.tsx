@@ -32,7 +32,13 @@ import {
   Building2,
   Armchair,
   FileText,
-  Sparkle
+  Sparkle,
+  Trophy,
+  Flame,
+  Gift,
+  Award,
+  Zap,
+  Target
 } from 'lucide-react';
 
 // Helper format mata uang Rupiah (IDR)
@@ -239,13 +245,120 @@ export default function App() {
   const [latestBookedTrip, setLatestBookedTrip] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
 
-  // Modal Tambahan untuk Halaman Lengkap (Notifikasi, E-Tiket QR, Detail Profil, Semua Destinasi)
+  // Modal Tambahan untuk Halaman Lengkap
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [activeTicketModal, setActiveTicketModal] = useState(null);
-  const [activeProfileSheet, setActiveProfileSheet] = useState(null); // 'payment' | 'insurance' | 'flight'
+  const [activeProfileSheet, setActiveProfileSheet] = useState(null);
   const [showAllPlacesModal, setShowAllPlacesModal] = useState(false);
   const [seatPreference, setSeatPreference] = useState('Kursi Jendela (Window)');
   const [mealPreference, setMealPreference] = useState('Halal Standar');
+
+  // --- STATE BOOKED TRIPS & GAMIFIKASI ---
+  const [bookedTrips, setBookedTrips] = useState([
+    {
+      bookingCode: 'TRV-8842',
+      place: DESTINATIONS[0],
+      guests: 2,
+      passengerName: 'Clara Vance',
+      date: '14 Des 2026',
+      totalPaid: 37000000,
+      paymentMethod: 'BCA Virtual Account',
+      status: 'Terkonfirmasi'
+    }
+  ]);
+
+  const [explorerXP, setExplorerXP] = useState(1450);
+  const [dailyStreak, setDailyStreak] = useState(4);
+  const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
+  const [viewedAdventureCount, setViewedAdventureCount] = useState(1);
+  const [claimedMissionIds, setClaimedMissionIds] = useState(['m1']);
+  const [showGamificationModal, setShowGamificationModal] = useState(false);
+  const [useXPDiscount, setUseXPDiscount] = useState(false);
+
+  // Perhitungan Level & Tier Penjelajah
+  const explorerLevelInfo = useMemo(() => {
+    if (explorerXP >= 3000) {
+      return {
+        tier: 'Platinum Nomad',
+        level: 4,
+        nextThreshold: 5000,
+        progress: Math.min(100, Math.round(((explorerXP - 3000) / 2000) * 100)),
+        badgeColor: 'from-indigo-500 to-purple-600'
+      };
+    }
+    if (explorerXP >= 1500) {
+      return {
+        tier: 'Gold Explorer',
+        level: 3,
+        nextThreshold: 3000,
+        progress: Math.round(((explorerXP - 1500) / 1500) * 100),
+        badgeColor: 'from-amber-400 to-orange-500'
+      };
+    }
+    return {
+      tier: 'Silver Voyager',
+      level: 2,
+      nextThreshold: 1500,
+      progress: Math.round((explorerXP / 1500) * 100),
+      badgeColor: 'from-sky-400 to-blue-600'
+    };
+  }, [explorerXP]);
+
+  const missionsList = useMemo(
+    () => [
+      {
+        id: 'm1',
+        title: 'Langkah Pertama',
+        desc: 'Lakukan pemesanan paket wisata pertama Anda',
+        xp: 500,
+        completed: bookedTrips.length >= 1,
+        progressText: `${Math.min(bookedTrips.length, 1)}/1 Trip`
+      },
+      {
+        id: 'm2',
+        title: 'Kolektor Impian',
+        desc: 'Simpan minimal 3 destinasi ke daftar favorit',
+        xp: 250,
+        completed: bookmarkedIds.length >= 3,
+        progressText: `${Math.min(bookmarkedIds.length, 3)}/3 Disimpan`
+      },
+      {
+        id: 'm3',
+        title: 'Jiwa Petualang',
+        desc: 'Jelajahi 2 destinasi kategori Petualangan',
+        xp: 300,
+        completed: viewedAdventureCount >= 2,
+        progressText: `${Math.min(viewedAdventureCount, 2)}/2 Destinasi`
+      },
+      {
+        id: 'm4',
+        title: 'Penjelajah Setia',
+        desc: 'Check-in harian untuk menjaga streak liburan',
+        xp: 150,
+        completed: hasCheckedInToday,
+        progressText: hasCheckedInToday ? 'Selesai Hari Ini' : 'Belum Check-in'
+      }
+    ],
+    [bookedTrips.length, bookmarkedIds.length, viewedAdventureCount, hasCheckedInToday]
+  );
+
+  const handleDailyCheckIn = () => {
+    if (hasCheckedInToday) {
+      setShowGamificationModal(true);
+      return;
+    }
+    setHasCheckedInToday(true);
+    setDailyStreak((s) => s + 1);
+    setExplorerXP((xp) => xp + 150);
+    showToast('Check-in Harian +150 XP! Streak +1 Hari 🔥');
+  };
+
+  const handleClaimMission = (mission) => {
+    if (!mission.completed || claimedMissionIds.includes(mission.id)) return;
+    setClaimedMissionIds((prev) => [...prev, mission.id]);
+    setExplorerXP((xp) => xp + mission.xp);
+    showToast(`Hadiah Misi Diklaim: +${mission.xp} XP! 🎉`);
+  };
 
   const [notifications, setNotifications] = useState([
     {
@@ -268,19 +381,6 @@ export default function App() {
       desc: 'E-Tiket ke Santorini untuk 2 peserta telah diterbitkan.',
       time: 'Kemarin',
       unread: false
-    }
-  ]);
-
-  // Pre-populated realistic booked trips
-  const [bookedTrips, setBookedTrips] = useState([
-    {
-      bookingCode: 'TRV-8842',
-      place: DESTINATIONS[0],
-      guests: 2,
-      date: '14 Des 2026',
-      totalPaid: 37000000,
-      paymentMethod: 'BCA Virtual Account',
-      status: 'Terkonfirmasi'
     }
   ]);
 
@@ -339,6 +439,9 @@ export default function App() {
     setSelectedPlace(place);
     setIsDescExpanded(false);
     setSelectedDateSlot(0);
+    if (place.category === 'Petualangan') {
+      setViewedAdventureCount((c) => c + 1);
+    }
     setActiveScreen('detail');
   };
 
@@ -347,6 +450,7 @@ export default function App() {
     setGuestsCount(2);
     setPromoCodeInput('');
     setAppliedPromoDiscount(0);
+    setUseXPDiscount(false);
     setBookingSuccess(false);
     setActiveScreen('checkout');
   };
@@ -376,7 +480,12 @@ export default function App() {
     ];
     const subtotal = checkoutPlace.price * guestsCount;
     const serviceFee = 250000;
-    const finalTotal = Math.max(0, subtotal + serviceFee - appliedPromoDiscount);
+    const xpDiscountAmount = useXPDiscount ? 750000 : 0;
+    const finalTotal = Math.max(
+      0,
+      subtotal + serviceFee - appliedPromoDiscount - xpDiscountAmount
+    );
+    const earnedXP = 400 + guestsCount * 100;
 
     const newTrip = {
       bookingCode: `TRV-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -390,6 +499,7 @@ export default function App() {
     };
     setBookedTrips((prev) => [newTrip, ...prev]);
     setLatestBookedTrip(newTrip);
+    setExplorerXP((prev) => (useXPDiscount ? prev - 1000 : prev) + earnedXP);
     setBookingSuccess(true);
   };
 
@@ -401,12 +511,9 @@ export default function App() {
       }`}
     >
       <span className="text-[13px] font-bold tracking-tight">18:18</span>
-
-      {/* Realistic iPhone Dynamic Island */}
       <div className="w-[96px] h-[25px] bg-black rounded-full flex items-center justify-end px-2.5 shadow-inner">
         <div className="w-2.5 h-2.5 rounded-full bg-[#1a233a] ring-1 ring-gray-800" />
       </div>
-
       <div className="flex items-center gap-1.5">
         <Signal className="w-3.5 h-3.5 stroke-[2.4]" />
         <Wifi className="w-3.5 h-3.5 stroke-[2.4]" />
@@ -415,7 +522,6 @@ export default function App() {
     </div>
   );
 
-  // --- Bottom Home Indicator Bar ---
   const renderHomeIndicator = () => (
     <div className="w-full flex justify-center pb-2 pt-1 bg-transparent pointer-events-none">
       <div className="w-32 h-1 rounded-full bg-gray-900/20" />
@@ -425,12 +531,10 @@ export default function App() {
   // --- SCREEN 1: ONBOARDING ---
   const renderOnboardingScreen = () => (
     <div className="relative w-full h-full bg-white flex flex-col justify-between overflow-hidden">
-      {/* Top Status Bar Overlaid on Image */}
       <div className="absolute top-0 inset-x-0 z-30">
         {renderStatusBar(true)}
       </div>
 
-      {/* Top Hero Image with Curved Bottom Mask */}
       <div className="relative w-full h-[64%] overflow-hidden">
         <img
           src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=900&q=85"
@@ -438,8 +542,6 @@ export default function App() {
           className="w-full h-full object-cover object-center scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/15" />
-
-        {/* Signature Asymmetric S-Curve Bottom Cutout */}
         <svg
           viewBox="0 0 360 95"
           preserveAspectRatio="none"
@@ -449,7 +551,6 @@ export default function App() {
         </svg>
       </div>
 
-      {/* Bottom Typography & CTA */}
       <div className="relative z-10 flex-1 bg-white px-7 pt-0 pb-4 flex flex-col items-center justify-between text-center">
         <div>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 text-[#0EA5E9] text-[11px] font-semibold mb-2">
@@ -474,7 +575,7 @@ export default function App() {
               setActiveScreen('main');
               setActiveTab('explore');
             }}
-            className="group w-full max-w-[240px] inline-flex items-center justify-center gap-2 px-7 py-4 rounded-full text-white font-semibold text-[15px] tracking-wide bg-gradient-to-r from-[#22B0FF] to-[#0095F6] shadow-[0_14px_28px_-6px_rgba(14,165,233,0.52)] hover:shadow-[0_18px_32px_-6px_rgba(14,165,233,0.65)] active:scale-95 transition-all duration-200 cursor-pointer"
+            className="group w-full max-w-[240px] inline-flex items-center justify-center gap-2 px-7 py-4 rounded-full text-white font-semibold text-[15px] tracking-wide bg-gradient-to-r from-[#22B0FF] to-[#0095F6] shadow-[0_14px_28px_-6px_rgba(14,165,233,0.52)] active:scale-95 transition-all cursor-pointer"
           >
             <span>Mulai Jelajah</span>
             <ChevronRight className="w-4 h-4 stroke-[2.5] group-hover:translate-x-0.5 transition-transform" />
@@ -488,7 +589,6 @@ export default function App() {
   // --- TAB 1: EXPLORE HOME CONTENT ---
   const renderExploreTab = () => (
     <div className="flex-1 overflow-y-auto no-scrollbar px-6 pt-2 pb-24">
-      {/* Top Header: Profile Avatar, Location & Notification */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <button
@@ -510,18 +610,67 @@ export default function App() {
           </div>
         </div>
 
-        <button
-          onClick={() => setShowNotificationsModal(true)}
-          className="relative w-10 h-10 rounded-2xl bg-white shadow-[0_6px_20px_rgba(0,0,0,0.04)] flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-95 transition-all cursor-pointer"
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowGamificationModal(true)}
+            className="flex items-center gap-1.5 px-3 h-10 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/70 shadow-2xs hover:brightness-95 active:scale-95 transition-all cursor-pointer"
+          >
+            <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500" />
+            <span className="text-[11px] font-extrabold text-amber-800">
+              {explorerXP.toLocaleString('id-ID')} XP
+            </span>
+          </button>
+
+          <button
+            onClick={() => setShowNotificationsModal(true)}
+            className="relative w-10 h-10 rounded-2xl bg-white shadow-[0_6px_20px_rgba(0,0,0,0.04)] flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-95 transition-all cursor-pointer"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#0EA5E9] ring-2 ring-white" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3.5 bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] rounded-2xl p-3 text-white shadow-[0_10px_22px_-8px_rgba(14,165,233,0.6)] flex items-center justify-between">
+        <div
+          onClick={() => setShowGamificationModal(true)}
+          className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
         >
-          <Bell className="w-4 h-4" />
-          {unreadNotificationsCount > 0 && (
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#0EA5E9] ring-2 ring-white" />
-          )}
+          <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
+            <Trophy className="w-4 h-4 text-amber-300" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-extrabold truncate">
+                {explorerLevelInfo.tier}
+              </span>
+              <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[9px] font-bold">
+                Lv.{explorerLevelInfo.level}
+              </span>
+            </div>
+            <div className="w-28 h-1.5 bg-black/20 rounded-full mt-1 overflow-hidden">
+              <div
+                className="h-full bg-amber-300 rounded-full transition-all duration-500"
+                style={{ width: `${explorerLevelInfo.progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={handleDailyCheckIn}
+          className={`px-3 py-1.5 rounded-xl text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
+            hasCheckedInToday
+              ? 'bg-white/20 text-white'
+              : 'bg-amber-300 text-gray-900 shadow-xs hover:bg-amber-200 active:scale-95'
+          }`}
+        >
+          {hasCheckedInToday ? `Streak ${dailyStreak}d ✓` : 'Klaim +150 XP'}
         </button>
       </div>
 
-      {/* Search Bar & Filter Button */}
       <div className="flex items-center gap-2.5 mt-4">
         <div className="flex-1 flex items-center gap-2 bg-white rounded-2xl px-3.5 py-3 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100">
           <Search className="w-4 h-4 text-gray-400 shrink-0" />
@@ -551,7 +700,6 @@ export default function App() {
         </button>
       </div>
 
-      {/* Travel Places Section */}
       <div className="mt-5">
         <div className="flex items-center justify-between mb-3">
           <h2
@@ -568,7 +716,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Vertical Left Tabs + Horizontal Cards Carousel */}
         <div className="relative flex items-center -ml-6">
           <div className="flex flex-col items-center justify-between h-[216px] w-11 shrink-0 py-2">
             {['Populer', 'Petualangan', 'Semua'].map((category) => {
@@ -677,7 +824,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Recommended Section */}
       <div className="mt-4">
         <div className="flex items-center justify-between mb-2.5">
           <h2
@@ -907,9 +1053,40 @@ export default function App() {
         >
           Clara Vance
         </h2>
-        <p className="text-xs text-gray-400">Anggota Gold Explorer • Jakarta & Makassar</p>
+        <div className="flex items-center gap-1.5 mt-1">
+          <span
+            className={`px-2.5 py-0.5 rounded-full text-white text-[10.5px] font-bold bg-gradient-to-r ${explorerLevelInfo.badgeColor}`}
+          >
+            {explorerLevelInfo.tier} • Lv.{explorerLevelInfo.level}
+          </span>
+          <span className="text-xs text-gray-400">• {dailyStreak} Hari Streak</span>
+        </div>
 
-        <div className="grid grid-cols-3 gap-3 w-full mt-5">
+        <div
+          onClick={() => setShowGamificationModal(true)}
+          className="w-full mt-4 bg-white p-3.5 rounded-2xl shadow-xs border border-amber-100 cursor-pointer hover:bg-amber-50/30 transition-all text-left"
+        >
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-gray-800 flex items-center gap-1.5">
+              <Trophy className="w-3.5 h-3.5 text-amber-500" />
+              Travel XP & Misi Penjelajah
+            </span>
+            <span className="font-extrabold text-[#0EA5E9]">
+              {explorerXP.toLocaleString('id-ID')} XP →
+            </span>
+          </div>
+          <div className="w-full h-2 bg-gray-100 rounded-full mt-2 overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-amber-400 to-[#0EA5E9] rounded-full transition-all duration-500"
+              style={{ width: `${explorerLevelInfo.progress}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1.5">
+            Kumpulkan {Math.max(0, explorerLevelInfo.nextThreshold - explorerXP).toLocaleString('id-ID')} XP lagi untuk naik ke level berikutnya!
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 w-full mt-3.5">
           <div className="bg-white p-3 rounded-2xl shadow-xs">
             <p className="text-base font-extrabold text-gray-900">{bookedTrips.length}</p>
             <p className="text-[10px] text-gray-400">Perjalanan</p>
@@ -984,7 +1161,6 @@ export default function App() {
       {activeTab === 'trips' && renderTripsTab()}
       {activeTab === 'profile' && renderProfileTab()}
 
-      {/* Realistic Floating Bottom Navigation Bar */}
       <div className="absolute bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-gray-100 px-6 pt-2.5 pb-1 z-30">
         <div className="flex items-center justify-between">
           {[
@@ -1025,12 +1201,10 @@ export default function App() {
 
     return (
       <div className="relative w-full h-full bg-white flex flex-col justify-between overflow-hidden">
-        {/* Top Status Bar Overlaid */}
         <div className="absolute top-0 inset-x-0 z-30">
           {renderStatusBar(true)}
         </div>
 
-        {/* Top Hero Image */}
         <div className="relative w-full h-[46%] overflow-hidden shrink-0">
           <img
             src={place.image}
@@ -1039,7 +1213,6 @@ export default function App() {
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/15" />
 
-          {/* Floating Back, Share & Bookmark Buttons */}
           <div className="absolute top-12 inset-x-6 flex items-center justify-between z-20">
             <button
               onClick={() => setActiveScreen('main')}
@@ -1072,7 +1245,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Signature Curved Cutout Transition */}
           <svg
             viewBox="0 0 360 64"
             preserveAspectRatio="none"
@@ -1082,7 +1254,6 @@ export default function App() {
           </svg>
         </div>
 
-        {/* Scrollable Details Section */}
         <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar bg-white px-6 pb-4">
           <div className="flex items-center justify-between">
             <h1
@@ -1102,7 +1273,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Country & Flight Info */}
           <div className="flex items-center justify-between mt-1">
             <div className="flex items-center gap-1">
               <MapPin className="w-3.5 h-3.5 text-[#0EA5E9] fill-[#0EA5E9]" />
@@ -1116,7 +1286,6 @@ export default function App() {
             </span>
           </div>
 
-          {/* Select Departure Date Pills */}
           <div className="mt-3.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
               Pilih Tanggal Keberangkatan
@@ -1138,7 +1307,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Description */}
           <div className="mt-3.5">
             <h3
               className="text-[14px] font-bold text-[#0EA5E9]"
@@ -1157,7 +1325,6 @@ export default function App() {
             </p>
           </div>
 
-          {/* Package Highlights */}
           <div className="mt-3.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
               Fasilitas Termasuk
@@ -1175,7 +1342,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Trip Members & Duration */}
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
             <div className="flex items-center gap-2">
               <div className="flex -space-x-2">
@@ -1203,7 +1369,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Sticky Bottom Price & Book Now Bar */}
         <div className="bg-white border-t border-gray-100 px-6 pt-3 pb-1">
           <div className="flex items-center justify-between">
             <div>
@@ -1231,20 +1396,24 @@ export default function App() {
     );
   };
 
-  // --- SCREEN 4: HALAMAN CHECKOUT LENGKAP (CheckoutPage) ---
+  // --- SCREEN 4: CHECKOUT PAGE ---
   const renderCheckoutPage = () => {
     const place = checkoutPlace || selectedPlace || DESTINATIONS[0];
     const dateOptions = [place.nextDeparture, '28 Des 2026', '15 Jan 2027'];
     const chosenDate = dateOptions[selectedDateSlot] || place.nextDeparture;
     const subtotal = place.price * guestsCount;
     const serviceFee = 250000;
-    const grandTotal = Math.max(0, subtotal + serviceFee - appliedPromoDiscount);
+    const xpDiscountAmount = useXPDiscount ? 750000 : 0;
+    const grandTotal = Math.max(
+      0,
+      subtotal + serviceFee - appliedPromoDiscount - xpDiscountAmount
+    );
+    const earnedXP = 400 + guestsCount * 100;
 
     return (
       <div className="relative w-full h-full bg-[#FAFAFB] flex flex-col justify-between overflow-hidden">
         {renderStatusBar(false)}
 
-        {/* Top Header */}
         <div className="px-6 pt-2 pb-3 flex items-center justify-between bg-white border-b border-gray-100 shrink-0">
           <button
             onClick={() => {
@@ -1276,9 +1445,7 @@ export default function App() {
 
         {!bookingSuccess ? (
           <>
-            {/* Scrollable Checkout Form */}
             <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-4 space-y-4">
-              {/* 1. Ringkasan Paket */}
               <div className="bg-white rounded-3xl p-3.5 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100">
                 <div className="flex items-center gap-3">
                   <img
@@ -1329,7 +1496,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 2. Data Pemesan Utama */}
               <div className="bg-white rounded-3xl p-4 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100 space-y-3">
                 <h4 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-[#0EA5E9]" />
@@ -1388,7 +1554,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 3. Kode Promo */}
               <div className="bg-white rounded-3xl p-4 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
@@ -1419,9 +1584,38 @@ export default function App() {
                     Terapkan
                   </button>
                 </div>
+
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center">
+                      <Zap className="w-3.5 h-3.5 fill-amber-400" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-gray-800">
+                        Tukar 1.000 XP (Hemat Rp 750 Rb)
+                      </p>
+                      <p className="text-[9.5px] text-gray-400">
+                        Saldo Anda: {explorerXP.toLocaleString('id-ID')} XP
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={explorerXP < 1000 && !useXPDiscount}
+                    onClick={() => setUseXPDiscount((v) => !v)}
+                    className={`px-3 py-1.5 rounded-xl text-[10.5px] font-bold transition-all cursor-pointer ${
+                      useXPDiscount
+                        ? 'bg-amber-400 text-gray-900'
+                        : explorerXP >= 1000
+                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        : 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                    }`}
+                  >
+                    {useXPDiscount ? 'Terpakai ✓' : 'Gunakan'}
+                  </button>
+                </div>
               </div>
 
-              {/* 4. Metode Pembayaran */}
               <div className="bg-white rounded-3xl p-4 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100 space-y-2.5">
                 <h4 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                   <Wallet className="w-3.5 h-3.5 text-[#0EA5E9]" />
@@ -1483,7 +1677,6 @@ export default function App() {
                 })}
               </div>
 
-              {/* 5. Rincian Harga */}
               <div className="bg-white rounded-3xl p-4 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100 space-y-2 text-xs">
                 <h4 className="font-bold text-gray-900 flex items-center gap-1.5 mb-1">
                   <FileText className="w-3.5 h-3.5 text-[#0EA5E9]" />
@@ -1509,6 +1702,16 @@ export default function App() {
                     <span>- {formatIDR(appliedPromoDiscount)}</span>
                   </div>
                 )}
+                {useXPDiscount && (
+                  <div className="flex justify-between text-amber-600 font-semibold">
+                    <span>Penukaran 1.000 Explorer XP</span>
+                    <span>- {formatIDR(xpDiscountAmount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-[#0EA5E9] font-semibold">
+                  <span>Bonus XP dari Perjalanan Ini</span>
+                  <span>+{earnedXP} XP</span>
+                </div>
                 <div className="pt-2 border-t border-dashed border-gray-200 flex justify-between items-center">
                   <span className="font-bold text-gray-900">Total Tagihan</span>
                   <span className="text-sm font-extrabold text-[#0EA5E9]">
@@ -1518,7 +1721,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Sticky Bottom Pay Bar */}
             <div className="bg-white border-t border-gray-100 px-6 pt-3 pb-1 shrink-0">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -1543,14 +1745,13 @@ export default function App() {
             </div>
           </>
         ) : (
-          /* Layar Sukses Setelah Checkout */
           <div className="flex-1 flex flex-col justify-between p-6 text-center bg-white">
             <div className="my-auto flex flex-col items-center">
               <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4 ring-8 ring-emerald-50/50">
                 <CheckCircle2 className="w-9 h-9" />
               </div>
               <span className="px-3 py-1 rounded-full bg-sky-50 text-[#0EA5E9] text-[10.5px] font-bold">
-                Kode Booking: {latestBookedTrip?.bookingCode}
+                Kode Booking: {latestBookedTrip?.bookingCode} • +{earnedXP} XP Didapat!
               </span>
               <h2
                 className="text-2xl font-extrabold text-gray-900 mt-2.5"
@@ -1616,24 +1817,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-[#E4E7EC] via-[#EEF1F5] to-[#DCE2EA] flex flex-col items-center justify-center py-6 px-4 font-sans select-none">
-      {/* Google Fonts Import */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* Realistic iPhone 15 Pro Titanium Hardware Bezel */}
       <div className="relative w-full max-w-[392px] h-[812px] bg-[#1C1D21] rounded-[56px] p-[12px] shadow-[0_35px_80px_-15px_rgba(15,23,42,0.35),0_0_0_2px_#3A3D45,inset_0_0_4px_rgba(255,255,255,0.2)]">
-        {/* Hardware Side Buttons */}
         <div className="hidden sm:block absolute -left-[3px] top-[130px] w-[3px] h-8 bg-[#3A3D45] rounded-l-sm" />
         <div className="hidden sm:block absolute -left-[3px] top-[180px] w-[3px] h-14 bg-[#3A3D45] rounded-l-sm" />
         <div className="hidden sm:block absolute -left-[3px] top-[248px] w-[3px] h-14 bg-[#3A3D45] rounded-l-sm" />
         <div className="hidden sm:block absolute -right-[3px] top-[200px] w-[3px] h-20 bg-[#3A3D45] rounded-r-sm" />
 
-        {/* Inner Mobile Screen Viewport */}
         <div className="relative w-full h-full bg-white rounded-[45px] overflow-hidden flex flex-col">
-          {/* In-App Toast Notification Banner */}
           {toastMessage && (
             <div className="absolute top-14 inset-x-8 z-50 bg-gray-900/90 backdrop-blur-md text-white text-xs font-semibold py-2.5 px-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
               <CheckCircle2 className="w-3.5 h-3.5 text-[#22B0FF]" />
@@ -1641,13 +1837,11 @@ export default function App() {
             </div>
           )}
 
-          {/* Active Screen Router */}
           {activeScreen === 'onboarding' && renderOnboardingScreen()}
           {activeScreen === 'main' && renderMainTabbedScreen()}
           {activeScreen === 'detail' && renderDetailScreen()}
           {activeScreen === 'checkout' && renderCheckoutPage()}
 
-          {/* Inside-Phone Filter Bottom Sheet */}
           {showFilterModal && (
             <div className="absolute inset-0 z-40 bg-black/45 backdrop-blur-xs flex items-end">
               <div className="bg-white w-full rounded-t-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom duration-200">
@@ -1720,7 +1914,6 @@ export default function App() {
             </div>
           )}
 
-          {/* MODAL LENGKAP 1: PANEL NOTIFIKASI */}
           {showNotificationsModal && (
             <div className="absolute inset-0 z-40 bg-black/45 backdrop-blur-xs flex items-end">
               <div className="bg-white w-full rounded-t-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom duration-200 max-h-[82%] flex flex-col">
@@ -1791,7 +1984,6 @@ export default function App() {
             </div>
           )}
 
-          {/* MODAL LENGKAP 2: E-TIKET & BOARDING PASS QR */}
           {activeTicketModal && (
             <div className="absolute inset-0 z-40 bg-black/50 backdrop-blur-xs flex items-center justify-center p-5">
               <div className="bg-white w-full rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
@@ -1842,7 +2034,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Visual QR Boarding Pass */}
                   <div className="pt-4 flex flex-col items-center text-center">
                     <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
                       <QrCode className="w-24 h-24 text-gray-900 stroke-[1.5]" />
@@ -1865,7 +2056,6 @@ export default function App() {
             </div>
           )}
 
-          {/* MODAL LENGKAP 3: SEMUA KATALOG DESTINASI */}
           {showAllPlacesModal && (
             <div className="absolute inset-0 z-40 bg-[#FAFAFB] flex flex-col animate-in slide-in-from-right duration-200">
               {renderStatusBar(false)}
@@ -1930,7 +2120,6 @@ export default function App() {
             </div>
           )}
 
-          {/* MODAL LENGKAP 4: PENGATURAN DETAIL PROFIL */}
           {activeProfileSheet && (
             <div className="absolute inset-0 z-40 bg-black/45 backdrop-blur-xs flex items-end">
               <div className="bg-white w-full rounded-t-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom duration-200">
@@ -2047,6 +2236,179 @@ export default function App() {
                 >
                   Simpan & Tutup
                 </button>
+              </div>
+            </div>
+          )}
+
+          {showGamificationModal && (
+            <div className="absolute inset-0 z-40 bg-black/50 backdrop-blur-xs flex items-end">
+              <div className="bg-[#FAFAFB] w-full rounded-t-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom duration-200 max-h-[86%] flex flex-col">
+                <div className="w-10 h-1 rounded-full bg-gray-300 mx-auto mb-4 shrink-0" />
+                <div className="flex items-center justify-between mb-3 shrink-0">
+                  <div>
+                    <h3
+                      className="text-lg font-bold text-gray-900"
+                      style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                    >
+                      Explorer Rewards
+                    </h3>
+                    <p className="text-[11px] text-gray-400">
+                      Selesaikan misi untuk poin XP & diskon wisata
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowGamificationModal(false)}
+                    className="w-8 h-8 rounded-full bg-white shadow-2xs flex items-center justify-center text-gray-500 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto no-scrollbar space-y-4 pr-0.5">
+                  <div
+                    className={`rounded-3xl p-4 text-white bg-gradient-to-br ${explorerLevelInfo.badgeColor} shadow-md`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-white/80 font-bold">
+                          Level {explorerLevelInfo.level} • Status Anda
+                        </p>
+                        <h4
+                          className="text-xl font-extrabold mt-0.5"
+                          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                        >
+                          {explorerLevelInfo.tier}
+                        </h4>
+                      </div>
+                      <div className="bg-white/20 backdrop-blur-xs px-3 py-1.5 rounded-2xl text-right">
+                        <p className="text-xs font-extrabold">
+                          {explorerXP.toLocaleString('id-ID')} XP
+                        </p>
+                        <p className="text-[9.5px] text-white/90 flex items-center justify-end gap-1">
+                          <Flame className="w-3 h-3 fill-amber-300 text-amber-300" />
+                          {dailyStreak} Hari Streak
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3">
+                      <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-white rounded-full transition-all duration-500"
+                          style={{ width: `${explorerLevelInfo.progress}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-white/85 mt-1">
+                        <span>Progress Level</span>
+                        <span>Target: {explorerLevelInfo.nextThreshold.toLocaleString('id-ID')} XP</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-800 mb-2 flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5 text-[#0EA5E9]" />
+                      Lencana Koleksi
+                    </h4>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        {
+                          name: 'Perintis',
+                          unlocked: bookedTrips.length >= 1,
+                          icon: Plane
+                        },
+                        {
+                          name: 'Kurator',
+                          unlocked: bookmarkedIds.length >= 3,
+                          icon: Bookmark
+                        },
+                        {
+                          name: 'Sultan Trip',
+                          unlocked: explorerXP >= 2000,
+                          icon: Trophy
+                        }
+                      ].map((b) => (
+                        <div
+                          key={b.name}
+                          className={`p-2.5 rounded-2xl border text-center ${
+                            b.unlocked
+                              ? 'bg-white border-amber-200 shadow-2xs'
+                              : 'bg-gray-100/70 border-gray-200 opacity-50'
+                          }`}
+                        >
+                          <div
+                            className={`w-8 h-8 rounded-xl mx-auto flex items-center justify-center mb-1 ${
+                              b.unlocked
+                                ? 'bg-amber-50 text-amber-500'
+                                : 'bg-gray-200 text-gray-400'
+                            }`}
+                          >
+                            <b.icon className="w-4 h-4" />
+                          </div>
+                          <p className="text-[10.5px] font-bold text-gray-800">
+                            {b.name}
+                          </p>
+                          <p className="text-[9px] text-gray-400">
+                            {b.unlocked ? 'Terbuka' : 'Terkunci'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-800 mb-2 flex items-center gap-1.5">
+                      <Target className="w-3.5 h-3.5 text-[#0EA5E9]" />
+                      Misi Penjelajah
+                    </h4>
+                    <div className="space-y-2">
+                      {missionsList.map((m) => {
+                        const isClaimed = claimedMissionIds.includes(m.id);
+                        return (
+                          <div
+                            key={m.id}
+                            className="bg-white p-3 rounded-2xl border border-gray-100 flex items-center justify-between gap-2.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-bold text-gray-900 truncate">
+                                  {m.title}
+                                </p>
+                                <span className="text-[9.5px] font-extrabold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md shrink-0">
+                                  +{m.xp} XP
+                                </span>
+                              </div>
+                              <p className="text-[10.5px] text-gray-400 truncate mt-0.5">
+                                {m.desc}
+                              </p>
+                              <p className="text-[9.5px] font-semibold text-[#0EA5E9] mt-0.5">
+                                {m.progressText}
+                              </p>
+                            </div>
+
+                            {isClaimed ? (
+                              <span className="px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 text-[10px] font-bold shrink-0">
+                                Diklaim ✓
+                              </span>
+                            ) : m.completed ? (
+                              <button
+                                onClick={() => handleClaimMission(m)}
+                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#22B0FF] to-[#0095F6] text-white text-[10.5px] font-bold shadow-xs hover:brightness-105 active:scale-95 transition-all shrink-0 cursor-pointer flex items-center gap-1"
+                              >
+                                <Gift className="w-3 h-3" />
+                                Klaim
+                              </button>
+                            ) : (
+                              <span className="px-2.5 py-1.5 rounded-xl bg-gray-100 text-gray-400 text-[10px] font-bold shrink-0">
+                                Berjalan
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
