@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Search,
   SlidersHorizontal,
@@ -94,11 +94,6 @@ export default function App() {
   // --- STATE BOOKED TRIPS & GAMIFIKASI ---
 
   // Perhitungan Level & Tier Penjelajah
-
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 2400);
-  };
 
   // Filtered destinations
   const toggleBookmark = (e, id) => {
