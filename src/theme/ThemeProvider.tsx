@@ -12,16 +12,20 @@ interface ThemeContextValue {
 const STORAGE_KEY = 'travel-tours-theme';
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function getInitialTheme(): Theme {
-  if (typeof window === 'undefined') return 'light';
+function getStoredTheme(): Theme | null {
+  if (typeof window === 'undefined') return null;
 
   try {
     const savedTheme = window.localStorage.getItem(STORAGE_KEY);
-    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    return savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : null;
   } catch {
     // Storage can be unavailable in private browsing contexts.
+    return null;
   }
+}
 
+function getSystemTheme(): Theme {
+  if (typeof window === 'undefined') return 'light';
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
@@ -31,24 +35,44 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children, defaultTheme }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(() => defaultTheme ?? getInitialTheme());
+  const [theme, setThemeState] = useState<Theme>(() => defaultTheme ?? getStoredTheme() ?? getSystemTheme());
+  const [followsSystem, setFollowsSystem] = useState(
+    () => defaultTheme === undefined && getStoredTheme() === null,
+  );
+
+  const setTheme = useCallback((nextTheme: Theme) => {
+    setThemeState(nextTheme);
+    setFollowsSystem(false);
+
+    try {
+      window.localStorage.setItem(STORAGE_KEY, nextTheme);
+    } catch {
+      // The selected theme still works for the current session.
+    }
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
-
-    try {
-      window.localStorage.setItem(STORAGE_KEY, theme);
-    } catch {
-      // The selected theme still works for the current session.
-    }
   }, [theme]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme((currentTheme) => currentTheme === 'light' ? 'dark' : 'light');
-  }, []);
+  useEffect(() => {
+    if (!followsSystem || typeof window.matchMedia !== 'function') return;
 
-  const value = useMemo(() => ({ theme, setTheme, toggleTheme }), [theme, toggleTheme]);
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      setThemeState(event.matches ? 'dark' : 'light');
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [followsSystem]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  }, [setTheme, theme]);
+
+  const value = useMemo(() => ({ theme, setTheme, toggleTheme }), [theme, setTheme, toggleTheme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
