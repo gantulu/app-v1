@@ -43,181 +43,57 @@ import {
 
 // Shared travel catalogue and formatting utilities
 import { DESTINATIONS, RECOMMENDED_TOURS, formatIDR, formatShortIDR } from './src/data/travel';
+import { useNavigation } from './src/hooks/useNavigation';
+import { useBooking } from './src/hooks/useBooking';
+import { usePayment } from './src/hooks/usePayment';
+import { useTrips } from './src/hooks/useTrips';
 
 export default function App() {
+  const [toastMessage, setToastMessage] = useState('');
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 2400);
+  };
+
+  const navigation = useNavigation();
+  const booking = useBooking();
+  const payment = usePayment(showToast);
+  const trips = useTrips(showToast, navigation.bookmarkedIds.length);
+
+  const {
+    bookedTrips, setBookedTrips, latestBookedTrip, setLatestBookedTrip,
+    explorerXP, setExplorerXP, dailyStreak, hasCheckedInToday,
+    viewedAdventureCount, setViewedAdventureCount, claimedMissionIds,
+    showGamificationModal, setShowGamificationModal, notifications,
+    unreadNotificationsCount, explorerLevelInfo, missionsList,
+    handleDailyCheckIn, handleClaimMission, markAllNotificationsRead
+  } = trips;
+  const {
+    filteredDestinations, filteredRecommended, allPlaces, savedPlaces
+  } = navigation;
+
   // Navigation & App Views
-  const [activeScreen, setActiveScreen] = useState('onboarding'); // 'onboarding' | 'main' | 'detail' | 'checkout'
-  const [activeTab, setActiveTab] = useState('explore'); // 'explore' | 'saved' | 'trips' | 'profile'
+  const { activeScreen, setActiveScreen, activeTab, setActiveTab } = navigation;
 
   // Interactive User State
-  const [selectedCategory, setSelectedCategory] = useState('Populer');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPlace, setSelectedPlace] = useState(DESTINATIONS[0]);
-  const [bookmarkedIds, setBookmarkedIds] = useState(['santorini', 'banff']);
-  const [isDescExpanded, setIsDescExpanded] = useState(false);
-  const [selectedDateSlot, setSelectedDateSlot] = useState(0);
+  const { selectedCategory, setSelectedCategory, searchQuery, setSearchQuery, selectedPlace, setSelectedPlace, bookmarkedIds, setBookmarkedIds, isDescExpanded, setIsDescExpanded, selectedDateSlot, setSelectedDateSlot } = navigation;
 
   // Filter & Checkout State
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [maxBudget, setMaxBudget] = useState(30000000);
-  const [checkoutPlace, setCheckoutPlace] = useState(null);
-  const [guestsCount, setGuestsCount] = useState(2);
-  const [passengerName, setPassengerName] = useState('Clara Vance');
-  const [passengerEmail, setPassengerEmail] = useState('clara.vance@email.id');
-  const [passengerPhone, setPassengerPhone] = useState('+62 812-4488-9021');
-  const [specialRequest, setSpecialRequest] = useState('');
-  const [promoCodeInput, setPromoCodeInput] = useState('');
-  const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('BCA Virtual Account');
-  const [bookingSuccess, setBookingSuccess] = useState(false);
-  const [latestBookedTrip, setLatestBookedTrip] = useState(null);
-  const [toastMessage, setToastMessage] = useState('');
+  const { showFilterModal, setShowFilterModal, maxBudget, setMaxBudget } = navigation;
+  const { checkoutPlace, setCheckoutPlace, guestsCount, setGuestsCount, passengerName, setPassengerName, passengerEmail, setPassengerEmail, passengerPhone, setPassengerPhone, specialRequest, setSpecialRequest, bookingSuccess, setBookingSuccess, useXPDiscount, setUseXPDiscount } = booking;
+  const { promoCodeInput, setPromoCodeInput, appliedPromoDiscount, setAppliedPromoDiscount, selectedPaymentMethod, setSelectedPaymentMethod, handleApplyPromo } = payment;
 
   // Modal Tambahan untuk Halaman Lengkap
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [activeTicketModal, setActiveTicketModal] = useState(null);
   const [activeProfileSheet, setActiveProfileSheet] = useState(null);
-  const [showAllPlacesModal, setShowAllPlacesModal] = useState(false);
+  const { showAllPlacesModal, setShowAllPlacesModal } = navigation;
   const [seatPreference, setSeatPreference] = useState('Kursi Jendela (Window)');
   const [mealPreference, setMealPreference] = useState('Halal Standar');
 
   // --- STATE BOOKED TRIPS & GAMIFIKASI ---
-  const [bookedTrips, setBookedTrips] = useState([
-    {
-      bookingCode: 'TRV-8842',
-      place: DESTINATIONS[0],
-      guests: 2,
-      passengerName: 'Clara Vance',
-      date: '14 Des 2026',
-      totalPaid: 37000000,
-      paymentMethod: 'BCA Virtual Account',
-      status: 'Terkonfirmasi'
-    }
-  ]);
-
-  const [explorerXP, setExplorerXP] = useState(1450);
-  const [dailyStreak, setDailyStreak] = useState(4);
-  const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
-  const [viewedAdventureCount, setViewedAdventureCount] = useState(1);
-  const [claimedMissionIds, setClaimedMissionIds] = useState(['m1']);
-  const [showGamificationModal, setShowGamificationModal] = useState(false);
-  const [useXPDiscount, setUseXPDiscount] = useState(false);
 
   // Perhitungan Level & Tier Penjelajah
-  const explorerLevelInfo = useMemo(() => {
-    if (explorerXP >= 3000) {
-      return {
-        tier: 'Platinum Nomad',
-        level: 4,
-        nextThreshold: 5000,
-        progress: Math.min(100, Math.round(((explorerXP - 3000) / 2000) * 100)),
-        badgeColor: 'from-indigo-500 to-purple-600'
-      };
-    }
-    if (explorerXP >= 1500) {
-      return {
-        tier: 'Gold Explorer',
-        level: 3,
-        nextThreshold: 3000,
-        progress: Math.round(((explorerXP - 1500) / 1500) * 100),
-        badgeColor: 'from-amber-400 to-orange-500'
-      };
-    }
-    return {
-      tier: 'Silver Voyager',
-      level: 2,
-      nextThreshold: 1500,
-      progress: Math.round((explorerXP / 1500) * 100),
-      badgeColor: 'from-sky-400 to-blue-600'
-    };
-  }, [explorerXP]);
-
-  const missionsList = useMemo(
-    () => [
-      {
-        id: 'm1',
-        title: 'Langkah Pertama',
-        desc: 'Lakukan pemesanan paket wisata pertama Anda',
-        xp: 500,
-        completed: bookedTrips.length >= 1,
-        progressText: `${Math.min(bookedTrips.length, 1)}/1 Trip`
-      },
-      {
-        id: 'm2',
-        title: 'Kolektor Impian',
-        desc: 'Simpan minimal 3 destinasi ke daftar favorit',
-        xp: 250,
-        completed: bookmarkedIds.length >= 3,
-        progressText: `${Math.min(bookmarkedIds.length, 3)}/3 Disimpan`
-      },
-      {
-        id: 'm3',
-        title: 'Jiwa Petualang',
-        desc: 'Jelajahi 2 destinasi kategori Petualangan',
-        xp: 300,
-        completed: viewedAdventureCount >= 2,
-        progressText: `${Math.min(viewedAdventureCount, 2)}/2 Destinasi`
-      },
-      {
-        id: 'm4',
-        title: 'Penjelajah Setia',
-        desc: 'Check-in harian untuk menjaga streak liburan',
-        xp: 150,
-        completed: hasCheckedInToday,
-        progressText: hasCheckedInToday ? 'Selesai Hari Ini' : 'Belum Check-in'
-      }
-    ],
-    [bookedTrips.length, bookmarkedIds.length, viewedAdventureCount, hasCheckedInToday]
-  );
-
-  const handleDailyCheckIn = () => {
-    if (hasCheckedInToday) {
-      setShowGamificationModal(true);
-      return;
-    }
-    setHasCheckedInToday(true);
-    setDailyStreak((s) => s + 1);
-    setExplorerXP((xp) => xp + 150);
-    showToast('Check-in Harian +150 XP! Streak +1 Hari 🔥');
-  };
-
-  const handleClaimMission = (mission) => {
-    if (!mission.completed || claimedMissionIds.includes(mission.id)) return;
-    setClaimedMissionIds((prev) => [...prev, mission.id]);
-    setExplorerXP((xp) => xp + mission.xp);
-    showToast(`Hadiah Misi Diklaim: +${mission.xp} XP! 🎉`);
-  };
-
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: 'Check-in Online Dibuka',
-      desc: 'Penerbangan ke Santorini (TRV-8842) siap untuk pemilihan kursi.',
-      time: '15 mnt lalu',
-      unread: true
-    },
-    {
-      id: 2,
-      title: 'Promo Akhir Tahun 15%',
-      desc: 'Nikmati potongan langsung untuk paket Petualangan Puncak Banff.',
-      time: '2 jam lalu',
-      unread: true
-    },
-    {
-      id: 3,
-      title: 'Pembayaran Terverifikasi',
-      desc: 'E-Tiket ke Santorini untuk 2 peserta telah diterbitkan.',
-      time: 'Kemarin',
-      unread: false
-    }
-  ]);
-
-  const unreadNotificationsCount = notifications.filter((n) => n.unread).length;
-
-  const markAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
-    showToast('Semua notifikasi ditandai sudah dibaca');
-  };
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -225,35 +101,6 @@ export default function App() {
   };
 
   // Filtered destinations
-  const filteredDestinations = useMemo(() => {
-    return DESTINATIONS.filter((place) => {
-      const matchesCategory =
-        selectedCategory === 'Semua' || place.category === selectedCategory;
-      const matchesSearch =
-        place.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        place.country.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesBudget = place.price <= maxBudget;
-      return matchesCategory && matchesSearch && matchesBudget;
-    });
-  }, [selectedCategory, searchQuery, maxBudget]);
-
-  const filteredRecommended = useMemo(() => {
-    return RECOMMENDED_TOURS.filter((tour) => {
-      const matchesSearch =
-        tour.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        tour.country.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesBudget = tour.price <= maxBudget;
-      return matchesSearch && matchesBudget;
-    });
-  }, [searchQuery, maxBudget]);
-
-  const allPlaces = useMemo(() => [...DESTINATIONS, ...RECOMMENDED_TOURS], []);
-
-  const savedPlaces = useMemo(
-    () => allPlaces.filter((p) => bookmarkedIds.includes(p.id)),
-    [allPlaces, bookmarkedIds]
-  );
-
   const toggleBookmark = (e, id) => {
     if (e) e.stopPropagation();
     setBookmarkedIds((prev) => {
@@ -281,18 +128,6 @@ export default function App() {
     setUseXPDiscount(false);
     setBookingSuccess(false);
     setActiveScreen('checkout');
-  };
-
-  const handleApplyPromo = () => {
-    const code = promoCodeInput.trim().toUpperCase();
-    if (!code) return;
-    if (code === 'LIBURANHEMAT' || code === 'EXPLORE15') {
-      setAppliedPromoDiscount(1500000);
-      showToast('Kode promo berhasil! Hemat Rp 1.500.000');
-    } else {
-      setAppliedPromoDiscount(0);
-      showToast('Kode promo tidak valid (Coba: LIBURANHEMAT)');
-    }
   };
 
   const confirmReservation = () => {
