@@ -1,11 +1,11 @@
 import type { TravelPackage } from '../types/travel';
 
 // Currency formatting helpers
-export const formatIDR = (amount) => {
+export const formatIDR = (amount: number): string => {
   return 'Rp ' + amount.toLocaleString('id-ID');
 };
 
-export const formatShortIDR = (amount) => {
+export const formatShortIDR = (amount: number): string => {
   const juta = amount / 1000000;
   return `Rp ${Number.isInteger(juta) ? juta : juta.toFixed(1).replace('.', ',')} Jt`;
 };
