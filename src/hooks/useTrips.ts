@@ -92,7 +92,7 @@ export function useTrips(showToast: (message: string) => void, bookmarkedCount: 
     explorerXP, setExplorerXP, dailyStreak, hasCheckedInToday,
     setHasCheckedInToday, setDailyStreak, viewedAdventureCount, setViewedAdventureCount,
     claimedMissionIds, setClaimedMissionIds, showGamificationModal, setShowGamificationModal,
-    notifications, unreadNotificationsCount, explorerLevelInfo, missionsList,
+    notifications, setNotifications, unreadNotificationsCount, explorerLevelInfo, missionsList,
     handleDailyCheckIn, handleClaimMission, markAllNotificationsRead
   };
 }
