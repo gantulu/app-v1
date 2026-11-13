@@ -64,7 +64,7 @@ export default function App() {
     bookedTrips, setBookedTrips, latestBookedTrip, setLatestBookedTrip,
     explorerXP, setExplorerXP, dailyStreak, hasCheckedInToday,
     viewedAdventureCount, setViewedAdventureCount, claimedMissionIds,
-    showGamificationModal, setShowGamificationModal, notifications,
+    showGamificationModal, setShowGamificationModal, notifications, setNotifications,
     unreadNotificationsCount, explorerLevelInfo, missionsList,
     handleDailyCheckIn, handleClaimMission, markAllNotificationsRead
   } = trips;
