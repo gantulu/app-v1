@@ -25,7 +25,14 @@ import {
   ShieldCheck,
   Bell,
   Share2,
-  CreditCard
+  CreditCard,
+  QrCode,
+  Check,
+  Wallet,
+  Building2,
+  Armchair,
+  FileText,
+  Sparkle
 } from 'lucide-react';
 
 // Helper format mata uang Rupiah (IDR)
@@ -205,7 +212,7 @@ const RECOMMENDED_TOURS = [
 
 export default function App() {
   // Navigation & App Views
-  const [activeScreen, setActiveScreen] = useState('onboarding'); // 'onboarding' | 'main' | 'detail'
+  const [activeScreen, setActiveScreen] = useState('onboarding'); // 'onboarding' | 'main' | 'detail' | 'checkout'
   const [activeTab, setActiveTab] = useState('explore'); // 'explore' | 'saved' | 'trips' | 'profile'
 
   // Interactive User State
@@ -216,13 +223,53 @@ export default function App() {
   const [isDescExpanded, setIsDescExpanded] = useState(false);
   const [selectedDateSlot, setSelectedDateSlot] = useState(0);
 
-  // Filter & Booking Modals
+  // Filter & Checkout State
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [maxBudget, setMaxBudget] = useState(30000000);
-  const [bookingModalPlace, setBookingModalPlace] = useState(null);
+  const [checkoutPlace, setCheckoutPlace] = useState(null);
   const [guestsCount, setGuestsCount] = useState(2);
+  const [passengerName, setPassengerName] = useState('Clara Vance');
+  const [passengerEmail, setPassengerEmail] = useState('clara.vance@email.id');
+  const [passengerPhone, setPassengerPhone] = useState('+62 812-4488-9021');
+  const [specialRequest, setSpecialRequest] = useState('');
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('BCA Virtual Account');
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [latestBookedTrip, setLatestBookedTrip] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
+
+  // Modal Tambahan untuk Halaman Lengkap (Notifikasi, E-Tiket QR, Detail Profil, Semua Destinasi)
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [activeTicketModal, setActiveTicketModal] = useState(null);
+  const [activeProfileSheet, setActiveProfileSheet] = useState(null); // 'payment' | 'insurance' | 'flight'
+  const [showAllPlacesModal, setShowAllPlacesModal] = useState(false);
+  const [seatPreference, setSeatPreference] = useState('Kursi Jendela (Window)');
+  const [mealPreference, setMealPreference] = useState('Halal Standar');
+
+  const [notifications, setNotifications] = useState([
+    {
+      id: 1,
+      title: 'Check-in Online Dibuka',
+      desc: 'Penerbangan ke Santorini (TRV-8842) siap untuk pemilihan kursi.',
+      time: '15 mnt lalu',
+      unread: true
+    },
+    {
+      id: 2,
+      title: 'Promo Akhir Tahun 15%',
+      desc: 'Nikmati potongan langsung untuk paket Petualangan Puncak Banff.',
+      time: '2 jam lalu',
+      unread: true
+    },
+    {
+      id: 3,
+      title: 'Pembayaran Terverifikasi',
+      desc: 'E-Tiket ke Santorini untuk 2 peserta telah diterbitkan.',
+      time: 'Kemarin',
+      unread: false
+    }
+  ]);
 
   // Pre-populated realistic booked trips
   const [bookedTrips, setBookedTrips] = useState([
@@ -232,9 +279,17 @@ export default function App() {
       guests: 2,
       date: '14 Des 2026',
       totalPaid: 37000000,
+      paymentMethod: 'BCA Virtual Account',
       status: 'Terkonfirmasi'
     }
   ]);
+
+  const unreadNotificationsCount = notifications.filter((n) => n.unread).length;
+
+  const markAllNotificationsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    showToast('Semua notifikasi ditandai sudah dibaca');
+  };
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -288,27 +343,53 @@ export default function App() {
   };
 
   const triggerBooking = (place) => {
-    setBookingModalPlace(place);
+    setCheckoutPlace(place);
     setGuestsCount(2);
+    setPromoCodeInput('');
+    setAppliedPromoDiscount(0);
     setBookingSuccess(false);
+    setActiveScreen('checkout');
+  };
+
+  const handleApplyPromo = () => {
+    const code = promoCodeInput.trim().toUpperCase();
+    if (!code) return;
+    if (code === 'LIBURANHEMAT' || code === 'EXPLORE15') {
+      setAppliedPromoDiscount(1500000);
+      showToast('Kode promo berhasil! Hemat Rp 1.500.000');
+    } else {
+      setAppliedPromoDiscount(0);
+      showToast('Kode promo tidak valid (Coba: LIBURANHEMAT)');
+    }
   };
 
   const confirmReservation = () => {
-    if (!bookingModalPlace) return;
+    if (!checkoutPlace) return;
+    if (!passengerName.trim()) {
+      showToast('Mohon isi nama lengkap pemesan');
+      return;
+    }
     const dateOptions = [
-      bookingModalPlace.nextDeparture,
+      checkoutPlace.nextDeparture,
       '28 Des 2026',
       '15 Jan 2027'
     ];
+    const subtotal = checkoutPlace.price * guestsCount;
+    const serviceFee = 250000;
+    const finalTotal = Math.max(0, subtotal + serviceFee - appliedPromoDiscount);
+
     const newTrip = {
       bookingCode: `TRV-${Math.floor(1000 + Math.random() * 9000)}`,
-      place: bookingModalPlace,
+      place: checkoutPlace,
       guests: guestsCount,
-      date: dateOptions[selectedDateSlot] || bookingModalPlace.nextDeparture,
-      totalPaid: bookingModalPlace.price * guestsCount,
+      passengerName: passengerName.trim(),
+      date: dateOptions[selectedDateSlot] || checkoutPlace.nextDeparture,
+      totalPaid: finalTotal,
+      paymentMethod: selectedPaymentMethod,
       status: 'Terkonfirmasi'
     };
     setBookedTrips((prev) => [newTrip, ...prev]);
+    setLatestBookedTrip(newTrip);
     setBookingSuccess(true);
   };
 
@@ -430,11 +511,13 @@ export default function App() {
         </div>
 
         <button
-          onClick={() => showToast('Tidak ada notifikasi penerbangan baru')}
+          onClick={() => setShowNotificationsModal(true)}
           className="relative w-10 h-10 rounded-2xl bg-white shadow-[0_6px_20px_rgba(0,0,0,0.04)] flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-95 transition-all cursor-pointer"
         >
           <Bell className="w-4 h-4" />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#0EA5E9] ring-2 ring-white" />
+          {unreadNotificationsCount > 0 && (
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#0EA5E9] ring-2 ring-white" />
+          )}
         </button>
       </div>
 
@@ -478,7 +561,7 @@ export default function App() {
             Destinasi Wisata
           </h2>
           <button
-            onClick={() => setSelectedCategory('Semua')}
+            onClick={() => setShowAllPlacesModal(true)}
             className="text-[11.5px] font-medium text-gray-400 hover:text-[#0EA5E9] transition-colors cursor-pointer"
           >
             Lihat Semua
@@ -604,7 +687,7 @@ export default function App() {
             Rekomendasi Tur
           </h2>
           <button
-            onClick={() => setSearchQuery('')}
+            onClick={() => setShowAllPlacesModal(true)}
             className="text-[11.5px] font-medium text-gray-400 hover:text-[#0EA5E9] transition-colors cursor-pointer"
           >
             Lihat Semua
@@ -785,12 +868,21 @@ export default function App() {
                 </div>
               </div>
 
-              <button
-                onClick={() => openPlaceDetail(trip.place)}
-                className="mt-3 w-full py-2.5 rounded-xl bg-sky-50 text-[#0EA5E9] text-xs font-bold hover:bg-sky-100 transition-colors cursor-pointer"
-              >
-                Lihat Rencana Perjalanan & Hotel
-              </button>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => setActiveTicketModal(trip)}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#22B0FF] to-[#0095F6] text-white text-xs font-bold shadow-xs hover:brightness-105 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  Buka E-Tiket
+                </button>
+                <button
+                  onClick={() => openPlaceDetail(trip.place)}
+                  className="px-3.5 py-2.5 rounded-xl bg-sky-50 text-[#0EA5E9] text-xs font-bold hover:bg-sky-100 transition-colors cursor-pointer"
+                >
+                  Detail
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -835,14 +927,29 @@ export default function App() {
 
       <div className="mt-6 space-y-2.5">
         {[
-          { icon: CreditCard, label: 'Metode Pembayaran', sub: 'BCA / Visa •••• 4829' },
-          { icon: ShieldCheck, label: 'Asuransi Perjalanan', sub: 'Allianz Global Aktif' },
-          { icon: Plane, label: 'Preferensi Penerbangan', sub: 'Kursi Jendela • Langsung' }
-        ].map((item, i) => (
+          {
+            key: 'payment',
+            icon: CreditCard,
+            label: 'Metode Pembayaran',
+            sub: `${selectedPaymentMethod} • Terhubung`
+          },
+          {
+            key: 'insurance',
+            icon: ShieldCheck,
+            label: 'Asuransi Perjalanan',
+            sub: 'Allianz Global Platinum Aktif'
+          },
+          {
+            key: 'flight',
+            icon: Plane,
+            label: 'Preferensi Penerbangan',
+            sub: `${seatPreference.split(' ')[0]} ${seatPreference.split(' ')[1]} • ${mealPreference}`
+          }
+        ].map((item) => (
           <div
-            key={i}
-            onClick={() => showToast(`${item.label} terverifikasi`)}
-            className="flex items-center justify-between bg-white p-3.5 rounded-2xl shadow-xs cursor-pointer hover:bg-gray-50"
+            key={item.key}
+            onClick={() => setActiveProfileSheet(item.key)}
+            className="flex items-center justify-between bg-white p-3.5 rounded-2xl shadow-xs cursor-pointer hover:bg-gray-50 active:scale-[0.99] transition-all"
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-sky-50 text-[#0EA5E9] flex items-center justify-center">
@@ -1124,6 +1231,389 @@ export default function App() {
     );
   };
 
+  // --- SCREEN 4: HALAMAN CHECKOUT LENGKAP (CheckoutPage) ---
+  const renderCheckoutPage = () => {
+    const place = checkoutPlace || selectedPlace || DESTINATIONS[0];
+    const dateOptions = [place.nextDeparture, '28 Des 2026', '15 Jan 2027'];
+    const chosenDate = dateOptions[selectedDateSlot] || place.nextDeparture;
+    const subtotal = place.price * guestsCount;
+    const serviceFee = 250000;
+    const grandTotal = Math.max(0, subtotal + serviceFee - appliedPromoDiscount);
+
+    return (
+      <div className="relative w-full h-full bg-[#FAFAFB] flex flex-col justify-between overflow-hidden">
+        {renderStatusBar(false)}
+
+        {/* Top Header */}
+        <div className="px-6 pt-2 pb-3 flex items-center justify-between bg-white border-b border-gray-100 shrink-0">
+          <button
+            onClick={() => {
+              if (bookingSuccess) {
+                setActiveScreen('main');
+                setActiveTab('trips');
+              } else {
+                setActiveScreen('detail');
+              }
+            }}
+            aria-label="Kembali"
+            className="w-9 h-9 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-800 hover:bg-gray-200 transition-colors cursor-pointer"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="text-center">
+            <h1
+              className="text-base font-bold text-gray-900"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            >
+              {bookingSuccess ? 'Pembayaran Berhasil' : 'Checkout Perjalanan'}
+            </h1>
+            <p className="text-[10px] text-gray-400">
+              {bookingSuccess ? 'E-Tiket Anda telah terbit' : 'Langkah Terakhir Pemesanan'}
+            </p>
+          </div>
+          <div className="w-9" />
+        </div>
+
+        {!bookingSuccess ? (
+          <>
+            {/* Scrollable Checkout Form */}
+            <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-4 space-y-4">
+              {/* 1. Ringkasan Paket */}
+              <div className="bg-white rounded-3xl p-3.5 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={place.image}
+                    alt={place.name}
+                    className="w-16 h-16 rounded-2xl object-cover shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-[#0EA5E9]">
+                      {place.category} • {place.duration}
+                    </span>
+                    <h3
+                      className="text-[15px] font-bold text-gray-900 truncate mt-1"
+                      style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                    >
+                      {place.name}, {place.country}
+                    </h3>
+                    <p className="text-[11px] text-gray-400 truncate">
+                      {place.hotelName}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 text-gray-600">
+                    <Calendar className="w-3.5 h-3.5 text-[#0EA5E9]" />
+                    <span className="font-semibold">{chosenDate}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setGuestsCount((g) => Math.max(1, g - 1))}
+                      className="w-6 h-6 rounded-full bg-gray-100 font-bold text-gray-700 hover:bg-gray-200 cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <span className="font-bold text-gray-900">
+                      {guestsCount} Peserta
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setGuestsCount((g) => Math.min(10, g + 1))}
+                      className="w-6 h-6 rounded-full bg-gray-100 font-bold text-gray-700 hover:bg-gray-200 cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Data Pemesan Utama */}
+              <div className="bg-white rounded-3xl p-4 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100 space-y-3">
+                <h4 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-[#0EA5E9]" />
+                  Data Pemesan & Kontak E-Tiket
+                </h4>
+
+                <div>
+                  <label className="block text-[10.5px] font-semibold text-gray-500 mb-1">
+                    Nama Lengkap (Sesuai Paspor/KTP)
+                  </label>
+                  <input
+                    type="text"
+                    value={passengerName}
+                    onChange={(e) => setPassengerName(e.target.value)}
+                    placeholder="Masukkan nama lengkap"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-100 text-xs font-medium text-gray-800 focus:outline-none focus:border-[#0EA5E9]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10.5px] font-semibold text-gray-500 mb-1">
+                      Email E-Tiket
+                    </label>
+                    <input
+                      type="email"
+                      value={passengerEmail}
+                      onChange={(e) => setPassengerEmail(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-medium text-gray-800 focus:outline-none focus:border-[#0EA5E9]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10.5px] font-semibold text-gray-500 mb-1">
+                      No. WhatsApp
+                    </label>
+                    <input
+                      type="tel"
+                      value={passengerPhone}
+                      onChange={(e) => setPassengerPhone(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-medium text-gray-800 focus:outline-none focus:border-[#0EA5E9]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10.5px] font-semibold text-gray-500 mb-1">
+                    Catatan Khusus (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={specialRequest}
+                    onChange={(e) => setSpecialRequest(e.target.value)}
+                    placeholder="Contoh: Kamar bebas asap rokok, kursi jendela..."
+                    className="w-full px-3.5 py-2 rounded-xl bg-gray-50 border border-gray-100 text-[11px] text-gray-800 focus:outline-none focus:border-[#0EA5E9]"
+                  />
+                </div>
+              </div>
+
+              {/* 3. Kode Promo */}
+              <div className="bg-white rounded-3xl p-4 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                    <Sparkle className="w-3.5 h-3.5 text-[#0EA5E9]" />
+                    Kode Promo
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPromoCodeInput('LIBURANHEMAT')}
+                    className="text-[10px] font-bold text-[#0EA5E9] hover:underline cursor-pointer"
+                  >
+                    Pakai LIBURANHEMAT
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promoCodeInput}
+                    onChange={(e) => setPromoCodeInput(e.target.value)}
+                    placeholder="Masukkan kode promo"
+                    className="flex-1 px-3.5 py-2 rounded-xl bg-gray-50 border border-gray-100 text-xs uppercase font-semibold text-gray-800 focus:outline-none focus:border-[#0EA5E9]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyPromo}
+                    className="px-4 py-2 rounded-xl bg-sky-50 text-[#0EA5E9] text-xs font-bold hover:bg-sky-100 transition-colors cursor-pointer"
+                  >
+                    Terapkan
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. Metode Pembayaran */}
+              <div className="bg-white rounded-3xl p-4 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100 space-y-2.5">
+                <h4 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                  <Wallet className="w-3.5 h-3.5 text-[#0EA5E9]" />
+                  Metode Pembayaran
+                </h4>
+
+                {[
+                  {
+                    name: 'BCA Virtual Account',
+                    sub: 'Verifikasi otomatis • Bebas biaya admin',
+                    icon: Building2
+                  },
+                  {
+                    name: 'QRIS Instan',
+                    sub: 'GoPay, OVO, DANA, ShopeePay & M-Banking',
+                    icon: QrCode
+                  },
+                  {
+                    name: 'Visa •••• 4829',
+                    sub: 'Kartu Kredit Utama • Cicilan 0% tersedia',
+                    icon: CreditCard
+                  }
+                ].map((method) => {
+                  const active = selectedPaymentMethod === method.name;
+                  return (
+                    <div
+                      key={method.name}
+                      onClick={() => setSelectedPaymentMethod(method.name)}
+                      className={`p-3 rounded-2xl border flex items-center justify-between transition-all cursor-pointer ${
+                        active
+                          ? 'bg-sky-50/80 border-[#0EA5E9]'
+                          : 'bg-gray-50 border-gray-100 hover:bg-gray-100/70'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-white text-[#0EA5E9] flex items-center justify-center shadow-2xs">
+                          <method.icon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-900">
+                            {method.name}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            {method.sub}
+                          </p>
+                        </div>
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded-full flex items-center justify-center border ${
+                          active
+                            ? 'bg-[#0EA5E9] border-[#0EA5E9] text-white'
+                            : 'border-gray-300'
+                        }`}
+                      >
+                        {active && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 5. Rincian Harga */}
+              <div className="bg-white rounded-3xl p-4 shadow-[0_6px_20px_rgba(0,0,0,0.03)] border border-gray-100 space-y-2 text-xs">
+                <h4 className="font-bold text-gray-900 flex items-center gap-1.5 mb-1">
+                  <FileText className="w-3.5 h-3.5 text-[#0EA5E9]" />
+                  Rincian Pembayaran
+                </h4>
+                <div className="flex justify-between text-gray-500">
+                  <span>
+                    Paket Wisata ({guestsCount}x {formatShortIDR(place.price)})
+                  </span>
+                  <span className="font-semibold text-gray-800">
+                    {formatIDR(subtotal)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-gray-500">
+                  <span>Asuransi & Biaya Layanan</span>
+                  <span className="font-semibold text-gray-800">
+                    {formatIDR(serviceFee)}
+                  </span>
+                </div>
+                {appliedPromoDiscount > 0 && (
+                  <div className="flex justify-between text-emerald-600 font-semibold">
+                    <span>Diskon Promo (LIBURANHEMAT)</span>
+                    <span>- {formatIDR(appliedPromoDiscount)}</span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-dashed border-gray-200 flex justify-between items-center">
+                  <span className="font-bold text-gray-900">Total Tagihan</span>
+                  <span className="text-sm font-extrabold text-[#0EA5E9]">
+                    {formatIDR(grandTotal)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Sticky Bottom Pay Bar */}
+            <div className="bg-white border-t border-gray-100 px-6 pt-3 pb-1 shrink-0">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-medium text-gray-400 block">
+                    Total Bayar
+                  </span>
+                  <span
+                    className="text-[16px] font-extrabold text-gray-900"
+                    style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                  >
+                    {formatIDR(grandTotal)}
+                  </span>
+                </div>
+                <button
+                  onClick={confirmReservation}
+                  className="px-6 py-3.5 rounded-full text-white font-semibold text-xs bg-gradient-to-r from-[#22B0FF] to-[#0095F6] shadow-[0_12px_24px_-6px_rgba(14,165,233,0.52)] hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+                >
+                  Bayar Sekarang
+                </button>
+              </div>
+              {renderHomeIndicator()}
+            </div>
+          </>
+        ) : (
+          /* Layar Sukses Setelah Checkout */
+          <div className="flex-1 flex flex-col justify-between p-6 text-center bg-white">
+            <div className="my-auto flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4 ring-8 ring-emerald-50/50">
+                <CheckCircle2 className="w-9 h-9" />
+              </div>
+              <span className="px-3 py-1 rounded-full bg-sky-50 text-[#0EA5E9] text-[10.5px] font-bold">
+                Kode Booking: {latestBookedTrip?.bookingCode}
+              </span>
+              <h2
+                className="text-2xl font-extrabold text-gray-900 mt-2.5"
+                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+              >
+                Pesanan Dikonfirmasi!
+              </h2>
+              <p className="text-xs text-gray-500 mt-1.5 max-w-[260px] leading-relaxed">
+                E-Tiket & voucher hotel untuk{' '}
+                <span className="font-bold text-gray-800">{place.name}</span> ({guestsCount} peserta) telah dikirim ke{' '}
+                <span className="font-semibold text-gray-700">{passengerEmail}</span>.
+              </p>
+
+              <div className="w-full bg-gray-50 rounded-3xl p-4 mt-5 text-left space-y-2 text-xs border border-gray-100">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Pemesan</span>
+                  <span className="font-bold text-gray-800">{passengerName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Keberangkatan</span>
+                  <span className="font-bold text-gray-800">{chosenDate}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Metode Bayar</span>
+                  <span className="font-bold text-gray-800">{selectedPaymentMethod}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-gray-200">
+                  <span className="text-gray-500 font-semibold">Total Lunas</span>
+                  <span className="font-extrabold text-[#0EA5E9]">
+                    {formatIDR(grandTotal)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              <button
+                onClick={() => {
+                  setActiveScreen('main');
+                  setActiveTab('trips');
+                  if (latestBookedTrip) setActiveTicketModal(latestBookedTrip);
+                }}
+                className="w-full py-3.5 rounded-full bg-gradient-to-r from-[#22B0FF] to-[#0095F6] text-white font-semibold text-xs shadow-md cursor-pointer"
+              >
+                Lihat E-Tiket & Kode QR
+              </button>
+              <button
+                onClick={() => {
+                  setActiveScreen('main');
+                  setActiveTab('explore');
+                }}
+                className="w-full py-3 rounded-full bg-gray-100 text-gray-700 font-semibold text-xs hover:bg-gray-200 cursor-pointer"
+              >
+                Kembali ke Beranda
+              </button>
+              {renderHomeIndicator()}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-[#E4E7EC] via-[#EEF1F5] to-[#DCE2EA] flex flex-col items-center justify-center py-6 px-4 font-sans select-none">
       {/* Google Fonts Import */}
@@ -1155,6 +1645,7 @@ export default function App() {
           {activeScreen === 'onboarding' && renderOnboardingScreen()}
           {activeScreen === 'main' && renderMainTabbedScreen()}
           {activeScreen === 'detail' && renderDetailScreen()}
+          {activeScreen === 'checkout' && renderCheckoutPage()}
 
           {/* Inside-Phone Filter Bottom Sheet */}
           {showFilterModal && (
@@ -1229,129 +1720,333 @@ export default function App() {
             </div>
           )}
 
-          {/* Inside-Phone Booking Bottom Sheet */}
-          {bookingModalPlace && (
+          {/* MODAL LENGKAP 1: PANEL NOTIFIKASI */}
+          {showNotificationsModal && (
             <div className="absolute inset-0 z-40 bg-black/45 backdrop-blur-xs flex items-end">
-              <div className="bg-white w-full rounded-t-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom duration-200">
-                <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-4" />
-                {!bookingSuccess ? (
-                  <>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-[#0EA5E9]" />
-                        <h3
-                          className="text-lg font-bold text-gray-900"
-                          style={{
-                            fontFamily: "'Playfair Display', Georgia, serif"
-                          }}
-                        >
-                          Konfirmasi Perjalanan
-                        </h3>
-                      </div>
-                      <button
-                        onClick={() => setBookingModalPlace(null)}
-                        className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-2xl mb-4">
-                      <img
-                        src={bookingModalPlace.image}
-                        alt={bookingModalPlace.name}
-                        className="w-14 h-14 rounded-xl object-cover"
-                      />
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-900">
-                          {bookingModalPlace.name}
-                        </h4>
-                        <p className="text-xs text-gray-500">
-                          {bookingModalPlace.hotelName} • {bookingModalPlace.duration}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 text-xs">
-                      <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                        <span className="text-gray-500 font-medium flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-[#0EA5E9]" />
-                          Jumlah Peserta
-                        </span>
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() =>
-                              setGuestsCount((g) => Math.max(1, g - 1))
-                            }
-                            className="w-7 h-7 rounded-full bg-gray-100 font-bold text-gray-700 hover:bg-gray-200 cursor-pointer"
-                          >
-                            -
-                          </button>
-                          <span className="font-bold text-gray-900 text-sm">
-                            {guestsCount}
-                          </span>
-                          <button
-                            onClick={() =>
-                              setGuestsCount((g) => Math.min(10, g + 1))
-                            }
-                            className="w-7 h-7 rounded-full bg-gray-100 font-bold text-gray-700 hover:bg-gray-200 cursor-pointer"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-gray-500 font-medium">Pembayaran</span>
-                        <span className="font-bold text-gray-800">BCA / Visa •••• 4829</span>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="text-gray-500 font-medium">Total Pembayaran</span>
-                        <span className="text-[15px] font-extrabold text-gray-900">
-                          {formatIDR(bookingModalPlace.price * guestsCount)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={confirmReservation}
-                      className="mt-5 w-full py-3.5 rounded-full bg-gradient-to-r from-[#22B0FF] to-[#0095F6] text-white font-semibold text-sm shadow-[0_12px_24px_-6px_rgba(14,165,233,0.5)] hover:brightness-105 cursor-pointer"
-                    >
-                      Bayar & Pesan Sekarang
-                    </button>
-                  </>
-                ) : (
-                  <div className="text-center py-3">
-                    <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mx-auto mb-3">
-                      <CheckCircle2 className="w-8 h-8" />
-                    </div>
+              <div className="bg-white w-full rounded-t-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom duration-200 max-h-[82%] flex flex-col">
+                <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-4 shrink-0" />
+                <div className="flex items-center justify-between mb-3 shrink-0">
+                  <div>
                     <h3
-                      className="text-xl font-bold text-gray-900"
+                      className="text-lg font-bold text-gray-900"
                       style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
                     >
-                      E-Tiket Terbit!
+                      Notifikasi
                     </h3>
-                    <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
-                      Perjalanan Anda ke{' '}
-                      <span className="font-semibold text-gray-800">
-                        {bookingModalPlace.name}
-                      </span>{' '}
-                      untuk {guestsCount} peserta telah ditambahkan ke{' '}
-                      <span className="font-semibold text-[#0EA5E9]">Trip Saya</span>.
+                    <p className="text-[11px] text-gray-400">
+                      Pembaruan jadwal & penawaran perjalanan
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {unreadNotificationsCount > 0 && (
+                      <button
+                        onClick={markAllNotificationsRead}
+                        className="text-[10.5px] font-bold text-[#0EA5E9] bg-sky-50 px-2.5 py-1.5 rounded-xl cursor-pointer"
+                      >
+                        Baca Semua
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowNotificationsModal(false)}
+                      className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5 overflow-y-auto no-scrollbar pr-0.5">
+                  {notifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      onClick={() =>
+                        setNotifications((prev) =>
+                          prev.map((n) =>
+                            n.id === notif.id ? { ...n, unread: false } : n
+                          )
+                        )
+                      }
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                        notif.unread
+                          ? 'bg-sky-50/60 border-sky-100'
+                          : 'bg-gray-50 border-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                          {notif.unread && (
+                            <span className="w-2 h-2 rounded-full bg-[#0EA5E9]" />
+                          )}
+                          {notif.title}
+                        </span>
+                        <span className="text-[10px] text-gray-400">{notif.time}</span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                        {notif.desc}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL LENGKAP 2: E-TIKET & BOARDING PASS QR */}
+          {activeTicketModal && (
+            <div className="absolute inset-0 z-40 bg-black/50 backdrop-blur-xs flex items-center justify-center p-5">
+              <div className="bg-white w-full rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="bg-gradient-to-r from-[#22B0FF] to-[#0095F6] p-5 text-white relative">
+                  <button
+                    onClick={() => setActiveTicketModal(null)}
+                    className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <p className="text-[10px] uppercase tracking-widest text-sky-100 font-bold">
+                    E-Tiket & Voucher Hotel
+                  </p>
+                  <h3
+                    className="text-xl font-extrabold mt-0.5"
+                    style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                  >
+                    {activeTicketModal.place.name}, {activeTicketModal.place.country}
+                  </h3>
+                  <p className="text-xs text-sky-100 mt-0.5">
+                    {activeTicketModal.place.hotelName}
+                  </p>
+                </div>
+
+                <div className="p-5">
+                  <div className="grid grid-cols-2 gap-3 text-xs pb-4 border-b border-dashed border-gray-200">
+                    <div>
+                      <p className="text-[10px] text-gray-400">Nama Penumpang</p>
+                      <p className="font-bold text-gray-900 mt-0.5">Clara Vance</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400">Kode Booking</p>
+                      <p className="font-bold text-[#0EA5E9] mt-0.5">
+                        {activeTicketModal.bookingCode}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400">Tanggal Berangkat</p>
+                      <p className="font-bold text-gray-900 mt-0.5">
+                        {activeTicketModal.date}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400">Jumlah Peserta</p>
+                      <p className="font-bold text-gray-900 mt-0.5">
+                        {activeTicketModal.guests} Orang ({activeTicketModal.place.duration})
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Visual QR Boarding Pass */}
+                  <div className="pt-4 flex flex-col items-center text-center">
+                    <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                      <QrCode className="w-24 h-24 text-gray-900 stroke-[1.5]" />
+                    </div>
+                    <p className="text-[10.5px] text-gray-400 mt-2">
+                      Pindai kode QR ini di konter check-in bandara & lobi hotel
                     </p>
                     <button
                       onClick={() => {
-                        setBookingModalPlace(null);
-                        setActiveScreen('main');
-                        setActiveTab('trips');
+                        showToast('E-Tiket PDF tersimpan ke perangkat');
+                        setActiveTicketModal(null);
                       }}
-                      className="mt-5 w-full py-3.5 rounded-full bg-gray-900 text-white font-semibold text-xs hover:bg-gray-800 cursor-pointer"
+                      className="mt-4 w-full py-3 rounded-full bg-gray-900 text-white text-xs font-bold hover:bg-gray-800 cursor-pointer"
                     >
-                      Lihat E-Tiket Saya
+                      Unduh E-Tiket (PDF)
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL LENGKAP 3: SEMUA KATALOG DESTINASI */}
+          {showAllPlacesModal && (
+            <div className="absolute inset-0 z-40 bg-[#FAFAFB] flex flex-col animate-in slide-in-from-right duration-200">
+              {renderStatusBar(false)}
+              <div className="px-6 pt-2 pb-3 flex items-center justify-between border-b border-gray-100 bg-white">
+                <button
+                  onClick={() => setShowAllPlacesModal(false)}
+                  className="w-9 h-9 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-800 cursor-pointer"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <h3
+                  className="text-base font-bold text-gray-900"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                >
+                  Semua Destinasi ({allPlaces.length})
+                </h3>
+                <div className="w-9" />
+              </div>
+
+              <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-3">
+                {allPlaces.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      setShowAllPlacesModal(false);
+                      openPlaceDetail(item);
+                    }}
+                    className="bg-white rounded-3xl p-3 shadow-xs flex items-center gap-3.5 cursor-pointer hover:shadow-md transition-all"
+                  >
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-20 h-20 rounded-2xl object-cover shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-[#0EA5E9]">
+                          {item.category}
+                        </span>
+                        <span className="flex items-center gap-0.5 text-xs font-bold text-gray-800">
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                          {item.rating}
+                        </span>
+                      </div>
+                      <h4
+                        className="text-[15px] font-bold text-gray-900 truncate mt-1"
+                        style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                      >
+                        {item.name}
+                      </h4>
+                      <p className="text-[11px] text-gray-400">
+                        {item.country} • {item.duration}
+                      </p>
+                      <p className="text-xs font-extrabold text-[#0EA5E9] mt-1">
+                        {formatIDR(item.price)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {renderHomeIndicator()}
+            </div>
+          )}
+
+          {/* MODAL LENGKAP 4: PENGATURAN DETAIL PROFIL */}
+          {activeProfileSheet && (
+            <div className="absolute inset-0 z-40 bg-black/45 backdrop-blur-xs flex items-end">
+              <div className="bg-white w-full rounded-t-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom duration-200">
+                <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-4" />
+                <div className="flex items-center justify-between mb-4">
+                  <h3
+                    className="text-lg font-bold text-gray-900"
+                    style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                  >
+                    {activeProfileSheet === 'payment' && 'Metode Pembayaran'}
+                    {activeProfileSheet === 'insurance' && 'Polis Asuransi Perjalanan'}
+                    {activeProfileSheet === 'flight' && 'Preferensi Penerbangan'}
+                  </h3>
+                  <button
+                    onClick={() => setActiveProfileSheet(null)}
+                    className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {activeProfileSheet === 'payment' && (
+                  <div className="space-y-2.5">
+                    {[
+                      { name: 'BCA Virtual Account', desc: 'Otomatis terverifikasi • Bebas biaya admin' },
+                      { name: 'QRIS Instan', desc: 'GoPay, OVO, DANA, ShopeePay & Mobile Banking' },
+                      { name: 'Visa •••• 4829', desc: 'Kartu Kredit Utama • Berlaku s/d 09/29' }
+                    ].map((pm) => {
+                      const active = selectedPaymentMethod === pm.name;
+                      return (
+                        <div
+                          key={pm.name}
+                          onClick={() => setSelectedPaymentMethod(pm.name)}
+                          className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer ${
+                            active
+                              ? 'bg-sky-50 border-[#0EA5E9]'
+                              : 'bg-gray-50 border-gray-100'
+                          }`}
+                        >
+                          <div>
+                            <p className="text-xs font-bold text-gray-900">{pm.name}</p>
+                            <p className="text-[10.5px] text-gray-400">{pm.desc}</p>
+                          </div>
+                          {active && <Check className="w-4 h-4 text-[#0EA5E9]" />}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
+
+                {activeProfileSheet === 'insurance' && (
+                  <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl p-4 space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-emerald-800">
+                        Allianz Global Travel Platinum
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold">
+                        AKTIF
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-600 leading-relaxed">
+                      Nomor Polis: <span className="font-bold">ALZ-ID-992041</span>. Melindungi pembatalan perjalanan, keterlambatan bagasi, hingga perlindungan medis internasional hingga Rp 1,5 Miliar.
+                    </p>
+                  </div>
+                )}
+
+                {activeProfileSheet === 'flight' && (
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <p className="font-bold text-gray-700 mb-1.5">Pilihan Kursi Favorit</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Kursi Jendela (Window)', 'Kursi Lorong (Aisle)'].map((seat) => (
+                          <button
+                            key={seat}
+                            onClick={() => setSeatPreference(seat)}
+                            className={`py-2.5 px-3 rounded-xl font-bold border text-[11px] cursor-pointer ${
+                              seatPreference === seat
+                                ? 'bg-sky-50 border-[#0EA5E9] text-[#0EA5E9]'
+                                : 'bg-gray-50 border-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {seat}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-700 mb-1.5">Preferensi Hidangan</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Halal Standar', 'Vegetarian'].map((meal) => (
+                          <button
+                            key={meal}
+                            onClick={() => setMealPreference(meal)}
+                            className={`py-2.5 px-3 rounded-xl font-bold border text-[11px] cursor-pointer ${
+                              mealPreference === meal
+                                ? 'bg-sky-50 border-[#0EA5E9] text-[#0EA5E9]'
+                                : 'bg-gray-50 border-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {meal}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    showToast('Pengaturan profil berhasil disimpan');
+                    setActiveProfileSheet(null);
+                  }}
+                  className="mt-5 w-full py-3.5 rounded-full bg-gradient-to-r from-[#22B0FF] to-[#0095F6] text-white font-semibold text-xs shadow-md cursor-pointer"
+                >
+                  Simpan & Tutup
+                </button>
               </div>
             </div>
           )}
