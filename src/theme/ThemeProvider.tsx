@@ -9,6 +9,11 @@ interface ThemeContextValue {
   toggleTheme: () => void;
 }
 
+interface InitialThemeState {
+  theme: Theme;
+  followsSystem: boolean;
+}
+
 const STORAGE_KEY = 'travel-tours-theme';
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
@@ -29,16 +34,24 @@ function getSystemTheme(): Theme {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function getInitialThemeState(defaultTheme?: Theme): InitialThemeState {
+  if (defaultTheme) return { theme: defaultTheme, followsSystem: false };
+
+  const storedTheme = getStoredTheme();
+  if (storedTheme) return { theme: storedTheme, followsSystem: false };
+
+  return { theme: getSystemTheme(), followsSystem: true };
+}
+
 interface ThemeProviderProps {
   children: ReactNode;
   defaultTheme?: Theme;
 }
 
 export function ThemeProvider({ children, defaultTheme }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<Theme>(() => defaultTheme ?? getStoredTheme() ?? getSystemTheme());
-  const [followsSystem, setFollowsSystem] = useState(
-    () => defaultTheme === undefined && getStoredTheme() === null,
-  );
+  const [initialState] = useState(() => getInitialThemeState(defaultTheme));
+  const [theme, setThemeState] = useState<Theme>(initialState.theme);
+  const [followsSystem, setFollowsSystem] = useState(initialState.followsSystem);
 
   const setTheme = useCallback((nextTheme: Theme) => {
     setThemeState(nextTheme);
